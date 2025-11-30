@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { LayoutGroup } from 'framer-motion';
 import { useShuntingYard } from '@/hooks/use-shunting-yard';
 import { VisualizerArea } from './visualizer-area';

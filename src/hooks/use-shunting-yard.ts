@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { generateSteps, generatePrefixSteps, tokenize } from '@/lib/shunting-yard';
 import type { StepState, VisualizerToken } from '@/lib/types';
 import { teacherModeNarration } from '@/ai/flows/teacher-mode-narration';

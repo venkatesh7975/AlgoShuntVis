@@ -5,6 +5,7 @@ import { VisualizerToken } from './visualizer-token';
 import type { StepState, VisualizerToken as TVisualizerToken } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { ScrollArea, ScrollBar } from '../ui/scroll-area';
+import { Card, CardContent } from '../ui/card';
 
 interface VisualizerAreaProps {
   tokens: TVisualizerToken[];
