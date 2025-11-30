@@ -36,13 +36,17 @@ export function tokenize(expression: string): VisualizerToken[] {
 function hasHigherPrecedence(op1: Operator, op2: Operator): boolean {
   const op1Info = OPERATORS[op1];
   const op2Info = OPERATORS[op2];
-  if (op1Info.precedence > op2Info.precedence) {
-    return true;
-  }
-  if (op1Info.precedence === op2Info.precedence && op1Info.associativity === 'Left') {
-    return true;
-  }
-  return false;
+  return op1Info.precedence > op2Info.precedence;
+}
+
+function hasEqualPrecedence(op1: Operator, op2: Operator): boolean {
+    const op1Info = OPERATORS[op1];
+    const op2Info = OPERATORS[op2];
+    return op1Info.precedence === op2Info.precedence;
+}
+
+function isLeftAssociative(op: Operator): boolean {
+    return OPERATORS[op].associativity === 'Left';
 }
 
 export function generateSteps(tokens: VisualizerToken[], forPrefix: boolean = false): StepState[] {
@@ -77,7 +81,6 @@ export function generateSteps(tokens: VisualizerToken[], forPrefix: boolean = fa
   }
 
   tokens.forEach(token => {
-    let currentMovedToken = token;
     switch (token.type) {
       case 'operand':
         output.push(token);
@@ -89,7 +92,8 @@ export function generateSteps(tokens: VisualizerToken[], forPrefix: boolean = fa
         while (
           stack.length > 0 &&
           stack[stack.length - 1].type === 'operator' &&
-          hasHigherPrecedence(stack[stack.length - 1].value as Operator, token.value as Operator)
+          (hasHigherPrecedence(stack[stack.length - 1].value as Operator, token.value as Operator) ||
+           (hasEqualPrecedence(stack[stack.length - 1].value as Operator, token.value as Operator) && isLeftAssociative(stack[stack.length-1].value as Operator)))
         ) {
           const op = stack.pop()!;
           output.push(op);
@@ -109,8 +113,9 @@ export function generateSteps(tokens: VisualizerToken[], forPrefix: boolean = fa
         break;
 
       case 'right_paren': {
+        addStep(`Token ')' found. Pop operators until '(' is found.`, token, 'stream');
         let popped: VisualizerToken[] = [];
-        let foundLeftParen = false;
+        
         while (stack.length > 0 && stack[stack.length - 1].type !== 'left_paren') {
           const op = stack.pop()!;
           output.push(op);
@@ -118,14 +123,13 @@ export function generateSteps(tokens: VisualizerToken[], forPrefix: boolean = fa
         }
 
         if (popped.length > 0) {
-          addStep(`Token ')' found. Pop operators from stack to output until '(' is found.`, popped[popped.length-1], 'stack', 'output', popped);
+          addStep(`Popping operators into output.`, popped[popped.length-1], 'stack', 'output', popped);
         }
         
         if (stack.length > 0 && stack[stack.length - 1].type === 'left_paren') {
             const leftParen = stack.pop()!;
-            addStep(`Found '('. Discard both parentheses.`, leftParen); // Not animating discard for simplicity
+            addStep(`Found '('. Discard both parentheses.`, leftParen);
         } else {
-             // Mismatched parentheses error state
             addStep("Error: Mismatched parentheses. ')' found without a matching '('.", token);
         }
         break;
