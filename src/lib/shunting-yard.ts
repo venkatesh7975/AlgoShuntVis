@@ -36,9 +36,13 @@ export function tokenize(expression: string): VisualizerToken[] {
 function hasHigherPrecedence(op1: Operator, op2: Operator): boolean {
   const op1Info = OPERATORS[op1];
   const op2Info = OPERATORS[op2];
-  return op1Info.associativity === 'Left'
-    ? op1Info.precedence >= op2Info.precedence
-    : op1Info.precedence > op2Info.precedence;
+  if (op1Info.precedence > op2Info.precedence) {
+    return true;
+  }
+  if (op1Info.precedence === op2Info.precedence && op1Info.associativity === 'Left') {
+    return true;
+  }
+  return false;
 }
 
 export function generateSteps(tokens: VisualizerToken[], forPrefix: boolean = false): StepState[] {
@@ -62,7 +66,7 @@ export function generateSteps(tokens: VisualizerToken[], forPrefix: boolean = fa
     steps.push({
       step: steps.length,
       description,
-      streamIds: tokens.slice(steps.length).map(t => t.id),
+      streamIds: tokens.slice(steps.length > 0 ? tokens.findIndex(t => t.id === steps[steps.length-1].movedTokenId) + 1 : 0).map(t => t.id),
       stackIds: [...stack].map(t => t.id),
       outputIds: [...output].map(t => t.id),
       movedTokenId: movedToken?.id,
@@ -73,6 +77,7 @@ export function generateSteps(tokens: VisualizerToken[], forPrefix: boolean = fa
   }
 
   tokens.forEach(token => {
+    let currentMovedToken = token;
     switch (token.type) {
       case 'operand':
         output.push(token);
@@ -121,7 +126,7 @@ export function generateSteps(tokens: VisualizerToken[], forPrefix: boolean = fa
             addStep(`Found '('. Discard both parentheses.`, leftParen); // Not animating discard for simplicity
         } else {
              // Mismatched parentheses error state
-            addStep("Error: Mismatched parentheses. ')' found without a matching '('.");
+            addStep("Error: Mismatched parentheses. ')' found without a matching '('.", token);
         }
         break;
       }
@@ -144,14 +149,35 @@ export function generateSteps(tokens: VisualizerToken[], forPrefix: boolean = fa
 
 
   const finalExpression = forPrefix ? [...output].reverse() : output;
+  const lastStep = steps[steps.length-1];
   steps.push({
-    ...steps[steps.length-1],
+    ...lastStep,
     step: steps.length,
     description: `Algorithm finished. Final ${forPrefix ? "prefix" : "postfix"} expression: ${finalExpression.map(t => t.value).join(' ')}`,
+    streamIds: [],
+    stackIds: [],
+    outputIds: output.map(t => t.id),
     isDone: true,
   });
 
-  return steps;
+  // A bit of a hack to make the stream appear correct on each step
+  const processedTokens = new Set<string>();
+  const correctedSteps = steps.map((step) => {
+    if (step.movedTokenId && step.from === 'stream') {
+        processedTokens.add(step.movedTokenId);
+    }
+    return {
+        ...step,
+        streamIds: tokens.filter(t => !processedTokens.has(t.id)).map(t => t.id),
+    }
+  });
+
+  // Final step should have empty stream
+  if (correctedSteps.length > 0) {
+      correctedSteps[correctedSteps.length -1].streamIds = [];
+  }
+
+  return correctedSteps;
 }
 
 
@@ -162,5 +188,13 @@ export function generatePrefixSteps(tokens: VisualizerToken[]): StepState[] {
         return token;
     });
 
-    return generateSteps(reversedTokens, true);
+    const prefixSteps = generateSteps(reversedTokens, true);
+    
+    // In prefix, the final output is reversed. Let's make sure the final step shows that.
+    const finalStep = prefixSteps[prefixSteps.length - 1];
+    if (finalStep && finalStep.isDone) {
+        finalStep.outputIds = [...finalStep.outputIds].reverse();
+    }
+    
+    return prefixSteps;
 }
